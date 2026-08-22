@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pt
+*.onnx
+runs/
+datasets/
+*.csv
+!scripts/*.csv
+.idea/
+.vscode/
+.DS_Store
