@@ -1,0 +1,56 @@
+# Gate control (Table 6, Supplementary Table S7): ungated StarNet s050 + Star-ADown + Cotton-SimAM (= SCD-YOLO minus the channel gate)
+# ---------------------------------------------------------------------------
+# Configuration used in the SCD-YOLO paper (three seeds each).
+#   Cotton-StarNet : StarNet s050 WITHOUT channel gate (starnet_s050_ungated)
+#   Neck downsamp. : Star-ADown at both positions
+#   Cotton-SimAM   : on (k=3, gamma=0.5)
+# Trained with --loss adaptive (Suppl. Table S7; run gate_ungated_full).
+# `nc: 80` is a placeholder; Ultralytics overrides it from the dataset YAML.
+# Expected parameter count (nc=6, after model.fuse(), YOLOv13 source tree of docs/INSTALL.md): 1,846,873 (= 1,915,507 - 68,634 gate parameters)
+# ---------------------------------------------------------------------------
+nc: 80
+scales:
+  n: [0.50, 0.25, 1024]
+  s: [0.50, 0.50, 1024]
+  l: [1.00, 1.00, 512]
+  x: [1.00, 1.50, 512]
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, starnet_s050_ungated, []]   # 0-4  stem + four stages (list output: P1, P2, P3, P4, P5)
+  - [2, 1, Conv, [512,  1, 1]]         # 5  1x1 adapter on P3 (32 -> 128)
+  - [3, 1, Conv, [512,  1, 1]]         # 6  1x1 adapter on P4 (64 -> 128)
+  - [4, 1, Conv, [1024, 1, 1]]         # 7  1x1 adapter on P5 (128 -> 256)
+
+head:
+  - [[5, 6, 7], 2, HyperACE, [512, 8, True, True, 0.5, 1, "both"]]  # 8
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 9
+  - [8, 1, DownsampleConv, []]                   # 10
+  - [[6, 8],  1, FullPAD_Tunnel, []]             # 11
+  - [[5, 9],  1, FullPAD_Tunnel, []]             # 12
+  - [[7, 10], 1, FullPAD_Tunnel, []]             # 13
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 14
+  - [[-1, 11], 1, Concat, [1]]                   # 15
+  - [-1, 2, DSC3k2, [512, True]]                 # 16
+  - [[-1, 8], 1, FullPAD_Tunnel, []]             # 17
+
+  - [16, 1, nn.Upsample, [None, 2, "nearest"]]   # 18
+  - [[-1, 12], 1, Concat, [1]]                   # 19
+  - [-1, 2, DSC3k2, [256, True]]                 # 20
+  - [9, 1, Conv, [256, 1, 1]]                    # 21
+  - [[20, 21], 1, FullPAD_Tunnel, []]            # 22  -> P3 branch
+
+  - [-1, 1, StarADown, [256]]                    # 23  neck downsampling P3->P4
+  - [[-1, 17], 1, Concat, [1]]                   # 24
+  - [-1, 2, DSC3k2, [512, True]]                 # 25
+  - [[-1, 8], 1, FullPAD_Tunnel, []]             # 26  -> P4 branch
+
+  - [25, 1, StarADown, [512]]                    # 27  neck downsampling P4->P5
+  - [[-1, 13], 1, Concat, [1]]                   # 28
+  - [-1, 2, DSC3k2, [1024, True]]                # 29
+  - [[-1, 10], 1, FullPAD_Tunnel, []]            # 30  -> P5 branch
+
+  - [22, 1, CottonSimAM, [0.0001, 3, 0.5]]       # 31  Cotton-SimAM on P3 (lambda, k, gamma)
+  - [26, 1, CottonSimAM, [0.0001, 3, 0.5]]       # 32  Cotton-SimAM on P4
+  - [30, 1, CottonSimAM, [0.0001, 3, 0.5]]       # 33  Cotton-SimAM on P5
+  - [[31, 32, 33], 1, Detect, [nc]]              # 34

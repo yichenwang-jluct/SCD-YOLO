@@ -1,0 +1,17 @@
+# cotton-cqamc — second cotton dataset, models retrained on this dataset (Table 14)
+# ---------------------------------------------------------------------------
+# A public cotton disease detection dataset from Roboflow Universe: same crop
+# domain as our dataset but a different source. Official split: 1,035 training
+# images; 94 validation images with 469 instances; 57 test images with 324 instances.
+#
+# The dataset is NOT redistributed here. Download it from the original source
+# (serosh, 2024, cited in the paper) and point `path` at the extracted folder.
+# ---------------------------------------------------------------------------
+
+path: <PATH_TO_COTTON_CQAMC>
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 5
+names: ['curl_stage1', 'curl_stage2', 'healthy', 'leaf_enation', 'sooty']
